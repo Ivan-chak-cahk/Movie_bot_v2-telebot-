@@ -143,3 +143,46 @@ def handel_history_button(message):
     user = get_or_create_user(message.from_user.id)
     show_history_menu(message.chat.id, user)
 
+# История поиска
+@bot.message_handler(func=lambda message: message.text == "Последние 5 запросов")
+def handel_last_5_searches(message):
+    user = get_or_create_user(message.from_user.id)
+    # Запрос к БД с сортировкой по дате и ограничением 5
+    searches = (SearchHistory
+                .select()
+                .where(SearchHistory.user == user)
+                .order_by(SearchHistory.created_at.desc())
+                .limit(5)
+                )
+    if not searches:
+        bot.send_message(message.chat.id, "Ваша история поиска пуста")
+        return
+
+    # Формирование сообщения для каждого запроса
+    for search in searches:
+        results = (SearchHistory
+                  .select()
+                  .where(SearchResult.search == search)
+                  .join(Movie)
+                  )
+
+        text = {
+            f"<b>{search.created_at.strftime('%d.%m.%Y %H:%M')}</b>\n"
+            f"Тип поиска: <b>{search.search_type}</b>\n"
+            f"Найдено результатов: <b>{results.count()}</b>\n\n"
+            "Нажмите на кнопку ниже для просмотра результатов:"
+        }
+
+        # Создание inline-кнопки для просмотра результатов
+        keyboard = types.InlineKeyboardMarkup()
+        keyboard.add(types.InlineKeyboardButton(
+            text="Показать результат",
+            callback_data=f"show_search_{search.id}"
+        ))
+
+        bot.send_message(
+            message.chat.id,
+            text,
+            parse_mode="HTML",
+            reply_markup=keyboard
+        )
