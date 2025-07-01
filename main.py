@@ -160,7 +160,7 @@ def handel_last_5_searches(message):
 
     # Формирование сообщения для каждого запроса
     for search in searches:
-        results = (SearchHistory
+        results = (SearchResult
                   .select()
                   .where(SearchResult.search == search)
                   .join(Movie)
@@ -186,3 +186,69 @@ def handel_last_5_searches(message):
             parse_mode="HTML",
             reply_markup=keyboard
         )
+
+# Обработчик inline-кнопки для показа результатов поиска
+@bot.callback_query_handler(func=lambda call: call.data.startswith("show_search_"))
+def show_search_result(call):
+    # Извлекаем ID поиска из callback_data (формат 'show_search_123')
+    search_id = int(call.data.split("_")[2])
+    # Получаем запись о поиске из базы данных
+    search = SearchHistory.get_by_id(search_id)
+    # Получаем все результаты этого поиска с информацией о фильмах
+    results = (SearchResult
+               .select()
+               .where(SearchResult.search == search)
+               .join(Movie)  # Соединяем с таблицей фильмов
+               .order_by(SearchResult.id)  # Сортируем по ID
+               )
+    # Для каждого результата формируем и отправляем сообщение
+    for result in results:
+        # Форматируем информацию о фильме
+        text, poster_url = format_movie_info(result.movie)
+        # Создаем inline-клавиатуру с кнопкой "Отметить просмотренным"
+        keyboard = create_watch_keyboard(result.id)
+        if poster_url:
+            # Если есть постер, отправляем фото с описанием
+            bot.send_photo(
+                call.message.chat.id,
+                poster_url,
+                caption=text,
+                parse_mode="HTML",
+                reply_markup=keyboard
+            )
+        else:
+            # Если постера нет, отправляем просто текст
+            bot.send_photo(
+                call.message.chat.id,
+                text,
+                parse_mode="HTML",
+                reply_markup=keyboard
+            )
+    # Подтверждаем обработку callback-запроса
+    bot.answer_callback_query(call.id)
+
+# Обработчик для отметки фильма просмотренным
+@bot.callback_query_handler(func=lambda call: call.data.startswith("watched_"))
+def mark_as_watched(call):
+    result_id = int(call.data.split("_")[1])
+    result = SearchResult.get_by_id(result_id)
+    # Инвертируем текущий статус просмотра
+    result.is_watched = not result.is_watched
+    result.save() # Сохраняем изменения в БД
+    # Формируем текст подтверждения
+    status = "просмотрен" if result.is_watched else "не просмотрен"
+    # Отправляем уведомление пользователю
+    bot.answer_callback_query(
+        call.id,
+        f"Фильм отмечен как{status}",
+        show_alert=False  # Всплывающее уведомление (не блокирующее)
+    )
+
+# возврат в основное меню
+@bot.message_handler(func=lambda message: message.text == "Назад в меню")
+def back_to_menu(message):
+    bot.send_message(
+        message.chat.id,
+        "Главное меню:",
+        reply_markup=create_main_keyboard()
+    )
