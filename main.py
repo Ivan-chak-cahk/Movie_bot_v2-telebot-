@@ -3,7 +3,6 @@ from telebot import types
 from config import TOKEN, API_KEY
 from models import Movie, SearchResult, SearchHistory, User, create_tables
 from kinopoisk_api import KinopoiskAPI
-from sdg import show_history_menu
 from utils import (
     create_main_keyboard, create_count_keyboard,
     create_genre_keyboard, create_watch_keyboard,
@@ -252,3 +251,76 @@ def back_to_menu(message):
         "Главное меню:",
         reply_markup=create_main_keyboard()
     )
+
+# Обработчик для поиска по названию
+@bot.message_handler(func=lambda message: message.text == "Поиск по названию")
+def search_by_name(message):
+    """Инициация поиска по названию"""
+    user_states[message.from_user.id] = UserState()  # Создание состояния
+    user_states[message.from_user.id].search_type = "Поиск по названию"
+
+    msg = bot.send_message(
+        message.chat.id,
+        "Введите название фильма или сериала:",
+        reply_markup=types.ReplyKeyboardRemove()  # Скрытие клавиатуры
+    )
+    # Ожидание ввода названия
+    bot.register_next_step_handler(msg, process_name_input)
+
+def process_name_input(message):
+    """Обработка введенного названия"""
+    user_id = message.from_user.id
+    if user_id not in user_states:
+        user_states[user_id] = UserState()
+
+    user_states[user_id].search_query = message.text  # Сохранение запроса
+
+    # Запрос жанра для фильтрации(если нужно)
+    msg = bot.send_message(
+        message.chat.id,
+        "Хотите указать жанр? (или нажмите 'Пропустить')",
+        reply_markup=create_genre_keyboard()
+    )
+    bot.register_next_step_handler(msg, process_genre_input)
+
+# Обработчик для поиска по рейтингу
+@bot.message_handler(func=lambda message: message.text == "Поиск по рейтингу")
+def search_by_rating(message):
+    """Инициация поиска по рейтингу"""
+    user_states[message.from_user.id] = UserState()  # Создание состояния
+    user_states[message.from_user.id].search_type = "Поиск по рейтингу"
+
+    msg = bot.send_message(
+        message.chat.id,
+        "Введите диапазон рейтинга (в формате '1-10')",
+        reply_markup=types.ReplyKeyboardRemove()
+    )
+    bot.register_next_step_handler(msg, process_rating_input)
+
+def process_rating_input(message):
+    """Обработка введенного диапазона рейтинга"""
+    try:
+        user_id = message.from_user.id
+        if user_id not in user_states:
+            user_states[user_id] = UserState()
+
+        # Парсинг диапазона (например, "7-9")
+        min_rating, max_rating = map(float, message.text.split("-"))
+        user_states[user_id].min_rating = min_rating
+        user_states[user_id].max_rating = max_rating
+
+        # Запрос жанра для фильтрации
+        msg = bot.send_message(
+            message.chat.id,
+            "Хотите указать жанр? (или нажмите 'Пропустить')",
+            reply_markup=create_genre_keyboard()
+        )
+        bot.register_next_step_handler(msg, process_genre_input)
+
+    except (ValueError, AttributeError):
+        # Обработка ошибки неверного формата
+        bot.send_message(
+            message.chat.id,
+            "Неверный формат. Введите диапазон в формате '1-10'",  # ???????
+            search_by_rating(message)  # Повторный запрос
+        )
