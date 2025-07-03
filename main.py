@@ -267,6 +267,7 @@ def search_by_name(message):
     # Ожидание ввода названия
     bot.register_next_step_handler(msg, process_name_input)
 
+
 def process_name_input(message):
     """Обработка введенного названия"""
     user_id = message.from_user.id
@@ -297,6 +298,7 @@ def search_by_rating(message):
     )
     bot.register_next_step_handler(msg, process_rating_input)
 
+
 def process_rating_input(message):
     """Обработка введенного диапазона рейтинга"""
     try:
@@ -324,3 +326,76 @@ def process_rating_input(message):
             "Неверный формат. Введите диапазон в формате '1-10'",  # ???????
             search_by_rating(message)  # Повторный запрос
         )
+
+# Обработчик для поиска по бюджету
+@bot.message_handler(func=lambda message: message.text == "Поиск по бюджету")
+def search_by_rating(message):
+    """Инициация поиска по бюджету"""
+    user_states[message.from_user.id] = UserState()  # Создание состояния
+    user_states[message.from_user.id].search_type = "Поиск по бюджету"
+    # клава для выбора бюджета
+    keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    keyboard.add(
+        types.KeyboardButton("Высокий бюджет"),
+        types.KeyboardButton("Низкий бюджет")
+    )
+
+    msg = bot.send_message(
+        message.chat.id,
+        "Выберете тип бюджета:",
+        reply_markup=keyboard
+    )
+    bot.register_next_step_handler(msg, process_budget_type_input)
+
+
+def process_budget_type_input(message):
+    """Обработка выбора бюджета"""
+    user_id = message.from_user.id
+    if user_id not in user_states:
+        user_states[user_id] = UserState()
+
+    if message.text == "Высокий бюджет":
+        user_states[user_id].budget_type = "high"
+    elif message.text == "Низкий бюджет":
+        user_states[user_id].budget_type = "low"
+    else:
+        bot.send_message(
+            message.chat.id,
+            "Пожалуйста, выберите один из предложенных вариантов"
+        )
+        return
+
+    msg = bot.send_message(
+        message.chat.id,
+        "Хотите указать жанр? (или нажмите 'Пропустить')",
+        reply_markup=create_genre_keyboard()
+    )
+    bot.register_next_step_handler(msg, process_genre_input)
+
+
+def process_genre_input(message):
+    """Обработка выбора жанра"""
+    user_id = message.from_user.id
+    if user_id not in user_states:
+        user_states[user_id] = UserState()
+
+    if message.text != "Пропустить":
+        user_states[user_id].genre = message.text  # Сохранение жанра
+
+    # Запрос количества результатов
+    msg = bot.send_message(
+        message.chat.id,
+        "Сколько результатов показать от 1 до 10?:",
+        reply_markup=create_count_keyboard()  # Клавиатура с цифрами
+    )
+    bot.register_next_step_handler(msg, process_count_input)
+
+
+# def process_count_input(message):
+#     """Обработка количества результатов"""
+#     try:
+#         user_id = message.from_user.id
+#         if user_id not in user_states:
+#             user_states[user_id] = UserState()
+#
+#
