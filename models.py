@@ -32,7 +32,7 @@ class SearchHistory(BaseModel):
 # Модель фильмов и сериалов
 class Movie(BaseModel):
     kp_id = IntegerField(unique=True)  # ID фильма в Kinopoisk API
-    name = CharField()  # Название фильма
+    name = CharField(null=True)  # Название фильма
     description = TextField(null=True)  # Описание
     rating_kp = FloatField(null=True)  # Рейтинг
     year = IntegerField(null=True)  # Год выпуска

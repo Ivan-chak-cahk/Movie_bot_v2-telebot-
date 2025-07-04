@@ -8,7 +8,6 @@ from utils import (
     create_genre_keyboard, create_watch_keyboard,
     format_movie_info
 )
-import datetime
 
 # Инициализация бота и API
 bot = telebot.TeleBot(TOKEN)  # Создание экземпляра бота
@@ -165,12 +164,12 @@ def handel_last_5_searches(message):
                   .join(Movie)
                   )
 
-        text = {
+        text = (
             f"<b>{search.created_at.strftime('%d.%m.%Y %H:%M')}</b>\n"
             f"Тип поиска: <b>{search.search_type}</b>\n"
             f"Найдено результатов: <b>{results.count()}</b>\n\n"
             "Нажмите на кнопку ниже для просмотра результатов:"
-        }
+        )
 
         # Создание inline-кнопки для просмотра результатов
         keyboard = types.InlineKeyboardMarkup()
@@ -217,7 +216,7 @@ def show_search_result(call):
             )
         else:
             # Если постера нет, отправляем просто текст
-            bot.send_photo(
+            bot.send_message(
                 call.message.chat.id,
                 text,
                 parse_mode="HTML",
@@ -239,7 +238,7 @@ def mark_as_watched(call):
     # Отправляем уведомление пользователю
     bot.answer_callback_query(
         call.id,
-        f"Фильм отмечен как{status}",
+        f"Фильм отмечен как {status}",
         show_alert=False  # Всплывающее уведомление (не блокирующее)
     )
 
@@ -324,8 +323,8 @@ def process_rating_input(message):
         bot.send_message(
             message.chat.id,
             "Неверный формат. Введите диапазон в формате '1-10'",  # ???????
-            search_by_rating(message)  # Повторный запрос
         )
+        bot.register_next_step_handler(message, process_rating_input)
 
 # Обработчик для поиска по бюджету
 @bot.message_handler(func=lambda message: message.text == "Поиск по бюджету")
@@ -445,25 +444,29 @@ def perform_search(message):
     results = []
 
     # Выбор API метода в зависимости от типа поиска
-    if state.search_type == "Поиск по названию":
-        results = kp_api.search_by_name(
-            state.search_query,
-            state.results_count,
-            state.genre
-        )
-    elif state.search_type == "Поиск по рейтингу":
-        results = kp_api.search_by_rating(
-            state.min_rating,
-            state.max_rating,
-            state.results_count,
-            state.genre
-        )
-    elif state.search_type == "Поиск по бюджету":
-        results = kp_api.search_by_budget(
-            state.budget_type,
-            state.results_count,
-            state.genre
-        )
+    try:
+        if state.search_type == "Поиск по названию":
+            results = kp_api.search_by_name(
+                state.search_query,
+                state.results_count,
+                state.genre
+            )
+        elif state.search_type == "Поиск по рейтингу":
+            results = kp_api.search_by_rating(
+                state.min_rating,
+                state.max_rating,
+                state.results_count,
+                state.genre
+            )
+        elif state.search_type == "Поиск по бюджету":
+            results = kp_api.search_by_budget(
+                state.budget_type,
+                state.results_count,
+                state.genre
+            )
+    except Exception as e:
+        bot.send_message(message.chat.id, f"Произошла ошибка при выполнении поиска: {e}")
+        return
 
     # Обработка пустого результата
     if not results:
@@ -498,12 +501,12 @@ def perform_search(message):
                 parse_mode='HTML'
             )
 
-        # Завершение поиска
-        bot.send_message(
-            message.chat.id,
-            "Поиск завершен. Что дальше?",
-            reply_markup=create_main_keyboard()
-        )
+    # Завершение поиска
+    bot.send_message(
+        message.chat.id,
+        "Поиск завершен. Что дальше?",
+        reply_markup=create_main_keyboard()
+    )
 
 @bot.message_handler(func=lambda message: True)
 def handle_unknown(message):

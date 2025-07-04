@@ -57,7 +57,7 @@ def format_movie_info(movie_data):
             'rating': movie_data.rating_kp,
             'year': movie_data.year,
             'genres': movie_data.genres,
-            'ageRating': movie_data.age_rating,
+            'age_rating': movie_data.age_rating,
             'poster': movie_data.poster_url
         }
     else:
