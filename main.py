@@ -391,11 +391,40 @@ def process_genre_input(message):
     bot.register_next_step_handler(msg, process_count_input)
 
 
-# def process_count_input(message):
-#     """Обработка количества результатов"""
-#     try:
-#         user_id = message.from_user.id
-#         if user_id not in user_states:
-#             user_states[user_id] = UserState()
-#
-#
+def process_count_input(message):
+    """Обработка количества результатов"""
+    try:
+        user_id = message.from_user.id
+        if user_id not in user_states:
+            user_states[user_id] = UserState()
+
+        count = int(message.text)
+        if 1 <= count <= 10:
+            user_states[user_id].results_count = count
+            perform_search(message)  # Запуск поиска
+        else:
+            # Ошибка: число вне диапазона
+            bot.send_message(
+                message.chat.id,
+                "Пожалуйста, введите число от 1 до 10"
+            )
+            # Повторный запрос
+            msg = bot.send_message(
+                message.chat.id,
+                "Сколько результатов показать? (1-10)",
+                reply_markup=create_count_keyboard()
+            )
+            bot.register_next_step_handler(msg, process_count_input)
+
+    except ValueError:
+        # Ошибка: введено не число
+        bot.send_message(
+            message.chat.id,
+            "Пожалуйста, введите число от 1 до 10"
+        )
+        msg = bot.send_message(
+            message.chat.id,
+            "Сколько результатов показать? (1-10)",
+            reply_markup=create_count_keyboard()
+        )
+        bot.register_next_step_handler(msg, process_count_input)
