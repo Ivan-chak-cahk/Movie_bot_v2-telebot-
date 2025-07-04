@@ -329,7 +329,7 @@ def process_rating_input(message):
 
 # Обработчик для поиска по бюджету
 @bot.message_handler(func=lambda message: message.text == "Поиск по бюджету")
-def search_by_rating(message):
+def search_by_budget(message):
     """Инициация поиска по бюджету"""
     user_states[message.from_user.id] = UserState()  # Создание состояния
     user_states[message.from_user.id].search_type = "Поиск по бюджету"
@@ -428,3 +428,97 @@ def process_count_input(message):
             reply_markup=create_count_keyboard()
         )
         bot.register_next_step_handler(msg, process_count_input)
+
+
+# Выполнение поиска и вывод результатов
+def perform_search(message):
+    """Основная функция поиска и вывода результатов"""
+    user_id = message.from_user.id
+    if user_id not in user_states:
+        bot.send_message(
+            message.chat.id,
+            "Произошла ошибка. Попробуйте снова"
+        )
+        return
+
+    state = user_states[user_id]
+    results = []
+
+    # Выбор API метода в зависимости от типа поиска
+    if state.search_type == "Поиск по названию":
+        results = kp_api.search_by_name(
+            state.search_query,
+            state.results_count,
+            state.genre
+        )
+    elif state.search_type == "Поиск по рейтингу":
+        results = kp_api.search_by_rating(
+            state.min_rating,
+            state.max_rating,
+            state.results_count,
+            state.genre
+        )
+    elif state.search_type == "Поиск по бюджету":
+        results = kp_api.search_by_budget(
+            state.budget_type,
+            state.results_count,
+            state.genre
+        )
+
+    # Обработка пустого результата
+    if not results:
+        bot.send_message(
+            message.chat.id,
+            "По вашему запросу ничего не найдено",
+           reply_markup=create_main_keyboard()
+        )
+        return
+
+    # Сохранение результатов в состоянии и БД
+    state.search_results = results
+    user = get_or_create_user(user_id)
+    save_search_history(user, state)
+
+    # Вывод каждого фильма
+    for movie in results:
+        text, poster_url = format_movie_info(movie)
+
+        if poster_url:
+            bot.send_photo(
+                message.chat.id,
+                poster_url,
+                caption=text,
+                parse_mode='HTML'
+            )
+        else:
+            # Отправка без постера
+            bot.send_message(
+                message.chat.id,
+                text,
+                parse_mode='HTML'
+            )
+
+        # Завершение поиска
+        bot.send_message(
+            message.chat.id,
+            "Поиск завершен. Что дальше?",
+            reply_markup=create_main_keyboard()
+        )
+
+@bot.message_handler(func=lambda message: True)
+def handle_unknown(message):
+    """
+    Обработчик для любых сообщений,
+    которые не были обработаны другими обработчиками.
+    Срабатывает только если ни один предыдущий handler не принял сообщение.
+    """
+    bot.send_message(
+        message.chat.id,
+        "Я не понимаю эту команду. Пожалуйста, используйте кнопки меню.",
+        reply_markup=create_main_keyboard()
+    )
+
+
+if __name__ == '__main__':
+    print("Бот запущен...")
+    bot.polling(none_stop=True)
